@@ -470,7 +470,7 @@ func (h *handlers) RegisterCourses(c echo.Context) error {
 		}
 
 		// すでに履修登録済みの科目は無視する
-		e, err := getOrInsertMap(&cache.isRegistrationExists, courseID+","+userID, func() (bool, error) {
+		e, err := getOrInsertMap(&cache.isRegistrationExists, courseID+userID, func() (bool, error) {
 			var e int
 			if err := tx.Get(&e, "SELECT 1 FROM `registrations` WHERE `course_id` = ? AND `user_id` = ?", course.ID, userID); err != nil {
 				return false, err
@@ -518,6 +518,7 @@ func (h *handlers) RegisterCourses(c echo.Context) error {
 			c.Logger().Error(err)
 			return c.NoContent(http.StatusInternalServerError)
 		}
+		cache.isRegistrationExists.Store(course.ID+userID, true)
 	}
 
 	if err = tx.Commit(); err != nil {
@@ -1565,7 +1566,7 @@ func (h *handlers) GetAnnouncementDetail(c echo.Context) error {
 		return c.String(http.StatusNotFound, "No such announcement.")
 	}
 
-	_, err = getOrInsertMap(&cache.isRegistrationExists, announcement.CourseID+","+userID, func() (bool, error) {
+	_, err = getOrInsertMap(&cache.isRegistrationExists, announcement.CourseID+userID, func() (bool, error) {
 		var e int
 		if err := tx.Get(&e, "SELECT 1 FROM `registrations` WHERE `course_id` = ? AND `user_id` = ?", announcement.CourseID, userID); err != nil {
 			return false, err
