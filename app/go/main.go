@@ -647,7 +647,6 @@ func (h *handlers) GetGrades(c echo.Context) error {
 
 		// 講義毎の成績計算処理
 		classScores := make([]ClassScore, 0, len(classes))
-		classScoreMap[course.ID] = classScores
 		for _, class := range classes {
 			// ユーザーのスコア
 			myScore := class.UserScore
@@ -667,6 +666,7 @@ func (h *handlers) GetGrades(c echo.Context) error {
 				Submitters: class.TotalCount,
 			})
 		}
+		classScoreMap[course.ID] = classScores
 	}
 
 	for _, course := range registeredCourses {
