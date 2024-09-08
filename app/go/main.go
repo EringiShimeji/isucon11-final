@@ -649,6 +649,7 @@ func (h *handlers) GetGrades(c echo.Context) error {
 	var classSummaries []ClassSummary
 	query = `
 		SELECT
+			cl.id,
 			COUNT(s.class_id) AS total_count,
 			MAX(CASE WHEN s.user_id = ? THEN s.score ELSE NULL END) AS user_score
 		FROM classes cl
