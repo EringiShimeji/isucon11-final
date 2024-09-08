@@ -620,13 +620,24 @@ func (h *handlers) GetGrades(c echo.Context) error {
 	myGPA := 0.0
 	myCredits := 0
 	for _, course := range registeredCourses {
-		// 講義一覧の取得
-		var classes []Class
-		query = "SELECT *" +
-			" FROM `classes`" +
-			" WHERE `course_id` = ?" +
-			" ORDER BY `part` DESC"
-		if err := h.DB.Select(&classes, query, course.ID); err != nil {
+		type MyClass struct {
+			Class
+			TotalCount int `db:"total_count"`
+			UserScore sql.NullInt64 `db:"user_score"`
+		}
+		var classes []MyClass
+		// course -> class -> submission
+		query = `
+			SELECT
+				COUNT(s.class_id) AS total_count,
+				MAX(CASE WHEN s.user_id = ? THEN s.score ELSE NULL END) AS user_score
+			FROM classes cl
+			LEFT JOIN submissions s ON cl.id = s.class_id
+			WHERE course_id = ?
+			GROUP BY cl.id
+			ORDER BY part DESC
+		`
+		if err := h.DB.Select(&classes, query, userID, course.ID); err != nil {
 			c.Logger().Error(err)
 			return c.NoContent(http.StatusInternalServerError)
 		}
@@ -635,20 +646,8 @@ func (h *handlers) GetGrades(c echo.Context) error {
 		classScores := make([]ClassScore, 0, len(classes))
 		var myTotalScore int
 		for _, class := range classes {
-			// 提出件数の取得
-			var submissionsCount int
-			if err := h.DB.Get(&submissionsCount, "SELECT COUNT(*) FROM `submissions` WHERE `class_id` = ?", class.ID); err != nil {
-				c.Logger().Error(err)
-				return c.NoContent(http.StatusInternalServerError)
-			}
-
 			// ユーザーのスコア
-			var myScore sql.NullInt64
-			err := h.DB.Get(&myScore, "SELECT `submissions`.`score` FROM `submissions` WHERE `user_id` = ? AND `class_id` = ?", userID, class.ID)
-			if err != nil && err != sql.ErrNoRows {
-				c.Logger().Error(err)
-				return c.NoContent(http.StatusInternalServerError)
-			}
+			myScore := class.UserScore
 
 			var myScorePtr *int
 			if err != sql.ErrNoRows && myScore.Valid {
@@ -662,7 +661,7 @@ func (h *handlers) GetGrades(c echo.Context) error {
 				Part:       class.Part,
 				Title:      class.Title,
 				Score:      myScorePtr,
-				Submitters: submissionsCount,
+				Submitters: class.TotalCount,
 			})
 		}
 
