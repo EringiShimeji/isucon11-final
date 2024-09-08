@@ -613,11 +613,12 @@ func (h *handlers) GetGrades(c echo.Context) error {
 		})
 	}
 
+	// course_id -> []Class を取得
+	courseClassMap := make(map[string][]Class)
 	courseIDs := make([]string, 0, len(registeredCourses))
 	for _, course := range registeredCourses {
 		courseIDs = append(courseIDs, course.ID)
 	}
-
 	var allClasses []Class
 	q := "SELECT * FROM classes WHERE course_id IN (?) ORDER BY part DESC"
 	query, args, _ := sqlx.In(q, courseIDs)
@@ -625,18 +626,16 @@ func (h *handlers) GetGrades(c echo.Context) error {
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
-	courseClassMap := make(map[string][]Class)
 	for _, class := range allClasses {
 		courseClassMap[class.CourseID] = append(courseClassMap[class.CourseID], class)
 	}
 
+	// 講義ごとの集計
 	type ClassSummary struct {
 		ClassID    string        `db:"class_id"`
 		TotalCount int           `db:"total_count"`
 		UserScore  sql.NullInt64 `db:"user_score"`
 	}
-
-	// 講義ごとの集計
 	classSummaryMap := make(map[string]ClassSummary) // key: class_id
 	var classSummaries []ClassSummary
 	query = `
