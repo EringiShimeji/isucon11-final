@@ -452,11 +452,6 @@ func (h *handlers) RegisterCourses(c echo.Context) error {
 	}
 	defer tx.Rollback()
 
-	courseIDs := make([]string, 0, len(req))
-	for _, courseReq := range req {
-		courseIDs = append(courseIDs, courseReq.ID)
-	}
-
 	// 存在するコースを先に取得
 	type MyCourse struct {
 		Course
@@ -469,7 +464,7 @@ func (h *handlers) RegisterCourses(c echo.Context) error {
 		WHERE c.id IN (?)
 		ORDER BY c.id
 	`
-	query, args, _ := sqlx.In(q, userID, courseIDs)
+	query, args, _ := sqlx.In(q, userID, req)
 	var courses []MyCourse
 	if err := tx.Select(&courses, tx.Rebind(query), args...); err != nil {
 		c.Logger().Error(err)
@@ -496,9 +491,9 @@ func (h *handlers) RegisterCourses(c echo.Context) error {
 	}
 
 	// errors.CourseNotFound を埋める
-	for _, courseID := range courseIDs {
-		if _, ok := foundCourseIDSet[courseID]; !ok {
-			errors.CourseNotFound = append(errors.CourseNotFound, courseID)
+	for _, r := range req {
+		if _, ok := foundCourseIDSet[r.ID]; !ok {
+			errors.CourseNotFound = append(errors.CourseNotFound, r.ID)
 		}
 	}
 
