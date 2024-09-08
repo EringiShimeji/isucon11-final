@@ -4,16 +4,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
-	"net/url"
-	"os"
-	"os/exec"
-	"sort"
-	"strconv"
-	"strings"
-	"sync"
-
 	"github.com/go-sql-driver/mysql"
 	"github.com/gorilla/sessions"
 	"github.com/jmoiron/sqlx"
@@ -22,6 +12,14 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"golang.org/x/crypto/bcrypt"
+	"io"
+	"net/http"
+	"net/url"
+	"os"
+	"os/exec"
+	"sort"
+	"strconv"
+	"strings"
 )
 
 const (
@@ -31,6 +29,8 @@ const (
 	SessionName               = "isucholar_go"
 	mysqlErrNumDuplicateEntry = 1062
 )
+
+var didStartedPProtein bool
 
 type handlers struct {
 	DB *sqlx.DB
@@ -95,10 +95,6 @@ type InitializeResponse struct {
 	Language string `json:"language"`
 }
 
-func startCollectingWithPProtein() {
-	http.Get("http://localhost:9000/api/group/collect")
-}
-
 // Initialize POST /initialize 初期化エンドポイント
 func (h *handlers) Initialize(c echo.Context) error {
 	dbForInit, _ := GetDB(true)
@@ -129,8 +125,13 @@ func (h *handlers) Initialize(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	var once sync.Once
-	once.Do(startCollectingWithPProtein)
+	if !didStartedPProtein {
+		if _, err := http.Get("http://localhost:9000/api/group/collect"); err != nil {
+			c.Logger().Errorf("failed to start pprotein: %w", err)
+			return c.NoContent(http.StatusInternalServerError)
+		}
+		didStartedPProtein = true
+	}
 
 	res := InitializeResponse{
 		Language: "go",
