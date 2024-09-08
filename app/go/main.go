@@ -128,6 +128,14 @@ func (h *handlers) Initialize(c echo.Context) error {
 	}
 
 	cache = newCache()
+	var r []string
+	if err := h.DB.Select(&r, "SELECT CONCAT(course_id, user_id) FROM registrations"); err != nil {
+		c.Logger().Error(err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
+	for _, key := range r {
+		cache.eRegistration.Store(key, true)
+	}
 
 	once.Do(func() {
 		if _, err := http.Get("http://localhost:9000/api/group/collect"); err != nil {
@@ -535,6 +543,7 @@ func (h *handlers) RegisterCourses(c echo.Context) error {
 			c.Logger().Error(err)
 			return c.NoContent(http.StatusInternalServerError)
 		}
+		cache.eRegistration.Store(course.ID+userID, true)
 	}
 
 	if err = tx.Commit(); err != nil {
@@ -954,7 +963,7 @@ func (h *handlers) SetCourseStatus(c echo.Context) error {
 	}
 	defer tx.Rollback()
 
-	_, err = getOrInsertMap(&cache.isCourseExists, courseID, func() (bool, error) {
+	_, err = getOrInsertMap(&cache.eCourse, courseID, func() (bool, error) {
 		var s string
 		if err := tx.Get(&s, "SELECT id FROM `courses` WHERE `id` = ?", courseID); err != nil {
 			return false, err
@@ -1018,7 +1027,7 @@ func (h *handlers) GetClasses(c echo.Context) error {
 	}
 	defer tx.Rollback()
 
-	_, err = getOrInsertMap(&cache.isCourseExists, courseID, func() (bool, error) {
+	_, err = getOrInsertMap(&cache.eCourse, courseID, func() (bool, error) {
 		var s string
 		if err := tx.Get(&s, "SELECT id FROM `courses` WHERE `id` = ?", courseID); err != nil {
 			return false, err
@@ -1159,13 +1168,8 @@ func (h *handlers) SubmitAssignment(c echo.Context) error {
 	}
 
 	// registration の存在確認
-	var e int
-	if err := tx.Get(&e, "SELECT 1 FROM `registrations` WHERE `user_id` = ? AND `course_id` = ?", userID, courseID); err != nil {
-		if err == sql.ErrNoRows {
-			return c.String(http.StatusBadRequest, "You have not taken this  course.")
-		}
-		c.Logger().Error(err)
-		return c.NoContent(http.StatusInternalServerError)
+	if !cache.isRegistrationExists(courseID, userID) {
+		return c.String(http.StatusBadRequest, "You have not taken this  course.")
 	}
 
 	var submissionClosed bool
@@ -1481,7 +1485,7 @@ func (h *handlers) AddAnnouncement(c echo.Context) error {
 	}
 	defer tx.Rollback()
 
-	_, err = getOrInsertMap(&cache.isCourseExists, req.CourseID, func() (bool, error) {
+	_, err = getOrInsertMap(&cache.eCourse, req.CourseID, func() (bool, error) {
 		var s string
 		if err := tx.Get(&s, "SELECT id FROM `courses` WHERE `id` = ?", req.CourseID); err != nil {
 			return false, err
@@ -1578,13 +1582,8 @@ func (h *handlers) GetAnnouncementDetail(c echo.Context) error {
 		return c.String(http.StatusNotFound, "No such announcement.")
 	}
 
-	var e int
-	if err := tx.Get(&e, "SELECT 1 FROM `registrations` WHERE `course_id` = ? AND `user_id` = ?", announcement.CourseID, userID); err != nil {
-		if err == sql.ErrNoRows {
-			return c.String(http.StatusNotFound, "No such announcement.")
-		}
-		c.Logger().Error(err)
-		return c.NoContent(http.StatusInternalServerError)
+	if !cache.isRegistrationExists(announcement.CourseID, userID) {
+		return c.String(http.StatusNotFound, "No such announcement.")
 	}
 
 	if _, err := tx.Exec("UPDATE `unread_announcements` SET `is_deleted` = TRUE WHERE `announcement_id` = ? AND `user_id` = ?", announcementID, userID); err != nil {
