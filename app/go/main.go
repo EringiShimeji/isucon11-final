@@ -404,8 +404,8 @@ func (h *handlers) GetRegisteredCourses(c echo.Context) error {
 	// 履修科目が0件の時は空配列を返却
 	res := make([]GetRegisteredCourseResponseContent, 0, len(courses))
 	tIds := make([]string, len(courses))
-	for i, c := range courses {
-		tIds[i] = c.TeacherID
+	for i, course := range courses {
+		tIds[i] = course.TeacherID
 	}
 	if len(courses) != 0 {
 		var teachers []User
