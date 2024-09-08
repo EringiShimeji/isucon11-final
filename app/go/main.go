@@ -619,7 +619,7 @@ func (h *handlers) GetGrades(c echo.Context) error {
 	courseResults := make([]CourseResult, 0, len(registeredCourses))
 	myGPA := 0.0
 	myCredits := 0
-	var myTotalScore int
+	totalScoreMap := make(map[string]int) // key: course_id
 	classScoreMap := make(map[string][]ClassScore) // key: course_id
 	for _, course := range registeredCourses {
 		type MyClass struct {
@@ -655,7 +655,7 @@ func (h *handlers) GetGrades(c echo.Context) error {
 			var myScorePtr *int
 			if err != sql.ErrNoRows && myScore.Valid {
 				score := int(myScore.Int64)
-				myTotalScore += score
+				totalScoreMap[course.ID] += score
 				myScorePtr = &score
 			}
 
@@ -685,6 +685,7 @@ func (h *handlers) GetGrades(c echo.Context) error {
 			return c.NoContent(http.StatusInternalServerError)
 		}
 
+		myTotalScore := totalScoreMap[course.ID]
 		classScores := classScoreMap[course.ID]
 		courseResults = append(courseResults, CourseResult{
 			Name:             course.Name,
