@@ -619,6 +619,8 @@ func (h *handlers) GetGrades(c echo.Context) error {
 	courseResults := make([]CourseResult, 0, len(registeredCourses))
 	myGPA := 0.0
 	myCredits := 0
+	var myTotalScore int
+	classScoreMap := make(map[string][]ClassScore) // key: course_id
 	for _, course := range registeredCourses {
 		type MyClass struct {
 			Class
@@ -645,7 +647,7 @@ func (h *handlers) GetGrades(c echo.Context) error {
 
 		// 講義毎の成績計算処理
 		classScores := make([]ClassScore, 0, len(classes))
-		var myTotalScore int
+		classScoreMap[course.ID] = classScores
 		for _, class := range classes {
 			// ユーザーのスコア
 			myScore := class.UserScore
@@ -665,7 +667,9 @@ func (h *handlers) GetGrades(c echo.Context) error {
 				Submitters: class.TotalCount,
 			})
 		}
+	}
 
+	for _, course := range registeredCourses {
 		// この科目を履修している学生のTotalScore一覧を取得
 		var totals []int
 		query := "SELECT IFNULL(SUM(`submissions`.`score`), 0) AS `total_score`" +
@@ -681,6 +685,7 @@ func (h *handlers) GetGrades(c echo.Context) error {
 			return c.NoContent(http.StatusInternalServerError)
 		}
 
+		classScores := classScoreMap[course.ID]
 		courseResults = append(courseResults, CourseResult{
 			Name:             course.Name,
 			Code:             course.Code,
