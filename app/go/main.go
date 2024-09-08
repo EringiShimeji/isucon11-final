@@ -695,7 +695,7 @@ func (h *handlers) GetGrades(c echo.Context) error {
 		" JOIN `courses` ON `registrations`.`course_id` = `courses`.`id`" +
 		" LEFT JOIN `classes` ON `courses`.`id` = `classes`.`course_id`" +
 		" LEFT JOIN `submissions` ON `users`.`id` = `submissions`.`user_id` AND `submissions`.`class_id` = `classes`.`id`" +
-		" GROUP BY `users`.`id`"
+		" GROUP BY `users`.`id`, `courses`.`id`"
 	var totals []CourseTotalScore
 	if err := h.DB.Select(&totals, query); err != nil {
 		c.Logger().Error(err)
