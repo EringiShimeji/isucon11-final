@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/gorilla/sessions"
@@ -124,10 +125,12 @@ func (h *handlers) Initialize(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	if _, err := http.Get("http://localhost:9000/api/group/collect"); err != nil {
-		c.Logger().Errorf("failed to request pprotein: %w", err)
-		return c.NoContent(http.StatusInternalServerError)
-	}
+	var once sync.Once
+	once.Do(func() {
+		if _, err := http.Get("http://localhost:9000/api/group/collect"); err != nil {
+			c.Logger().Errorf("failed to request pprotein: %w", err)
+		}
+	})
 
 	res := InitializeResponse{
 		Language: "go",
