@@ -126,6 +126,8 @@ func (h *handlers) Initialize(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
+	cache = newCache()
+
 	once.Do(func() {
 		if _, err := http.Get("http://localhost:9000/api/group/collect"); err != nil {
 			c.Logger().Errorf("failed to start pprotein: %w", err)
@@ -987,13 +989,19 @@ func (h *handlers) GetClasses(c echo.Context) error {
 	}
 	defer tx.Rollback()
 
-	var count int
-	if err := tx.Get(&count, "SELECT COUNT(*) FROM `courses` WHERE `id` = ?", courseID); err != nil {
+	_, err = getOrInsertMap(&cache.isCourseExists, courseID, func() (bool, error) {
+		var s string
+		if err := tx.Get(&s, "SELECT id FROM `courses` WHERE `id` = ?", courseID); err != nil {
+			return false, err
+		}
+		return true, nil
+	})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return c.String(http.StatusNotFound, "No such course.")
+		}
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
-	}
-	if count == 0 {
-		return c.String(http.StatusNotFound, "No such course.")
 	}
 
 	var classes []ClassWithSubmitted
@@ -1442,13 +1450,19 @@ func (h *handlers) AddAnnouncement(c echo.Context) error {
 	}
 	defer tx.Rollback()
 
-	var count int
-	if err := tx.Get(&count, "SELECT COUNT(*) FROM `courses` WHERE `id` = ?", req.CourseID); err != nil {
+	_, err = getOrInsertMap(&cache.isCourseExists, req.CourseID, func() (bool, error) {
+		var s string
+		if err := tx.Get(&s, "SELECT id FROM `courses` WHERE `id` = ?", req.CourseID); err != nil {
+			return false, err
+		}
+		return true, nil
+	})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return c.String(http.StatusNotFound, "No such course.")
+		}
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
-	}
-	if count == 0 {
-		return c.String(http.StatusNotFound, "No such course.")
 	}
 
 	if _, err := tx.Exec("INSERT INTO `announcements` (`id`, `course_id`, `title`, `message`) VALUES (?, ?, ?, ?)",
