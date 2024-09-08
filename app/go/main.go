@@ -620,6 +620,7 @@ func (h *handlers) GetGrades(c echo.Context) error {
 		// course -> class -> submission
 		query = `
 			SELECT
+				cl.*,
 				COUNT(s.class_id) AS total_count,
 				MAX(CASE WHEN s.user_id = ? THEN s.score ELSE NULL END) AS user_score
 			FROM classes cl
