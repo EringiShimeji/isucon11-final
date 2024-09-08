@@ -1191,8 +1191,6 @@ func (h *handlers) SubmitAssignment(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	bufReader := bufio.NewReader(file)
-
 	dst := AssignmentsDirectory + classID + "-" + userID + ".pdf"
 	out, err := os.Create(dst)
 	defer out.Close()
@@ -1200,10 +1198,8 @@ func (h *handlers) SubmitAssignment(c echo.Context) error {
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
-	bufWriter := bufio.NewWriter(out)
-	defer bufWriter.Flush()
 
-	_, err = io.Copy(bufWriter, bufReader)
+	_, err = io.Copy(out, file)
 	if err != nil {
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
