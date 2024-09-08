@@ -126,11 +126,12 @@ func (h *handlers) Initialize(c echo.Context) error {
 	}
 
 	var once sync.Once
-	once.Do(func() {
+	f := func() {
 		if _, err := http.Get("http://localhost:9000/api/group/collect"); err != nil {
 			c.Logger().Errorf("failed to request pprotein: %w", err)
 		}
-	})
+	}
+	once.Do(f)
 
 	res := InitializeResponse{
 		Language: "go",
