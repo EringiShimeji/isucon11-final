@@ -178,3 +178,14 @@ func tScoreFloat64(v float64, arr []float64) float64 {
 		return (v-avg)/stdDev*10 + 50
 	}
 }
+
+func getOrInsertMap[V any](m *sync.Map, key any, f func() (V, error)) (V, error) {
+	if v, ok := m.Load(key); ok {
+		return v.(V), nil
+	}
+	v, err := f()
+	if err == nil {
+		m.Store(key, v)
+	}
+	return v, err
+}
