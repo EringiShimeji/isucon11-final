@@ -20,6 +20,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 const (
@@ -30,7 +31,7 @@ const (
 	mysqlErrNumDuplicateEntry = 1062
 )
 
-var didStartedPProtein bool
+var once sync.Once
 
 type handlers struct {
 	DB *sqlx.DB
@@ -125,13 +126,11 @@ func (h *handlers) Initialize(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	if !didStartedPProtein {
+	once.Do(func() {
 		if _, err := http.Get("http://localhost:9000/api/group/collect"); err != nil {
 			c.Logger().Errorf("failed to start pprotein: %w", err)
-			return c.NoContent(http.StatusInternalServerError)
 		}
-		didStartedPProtein = true
-	}
+	})
 
 	res := InitializeResponse{
 		Language: "go",
