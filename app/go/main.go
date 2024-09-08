@@ -459,7 +459,7 @@ func (h *handlers) RegisterCourses(c echo.Context) error {
 		SELECT *
 		FROM courses c
 		LEFT JOIN registrations r ON c.id = r.course_id AND r.user_id = ?
-		WHERE c.id = ? AND r.id IS NULL
+		WHERE c.id IN (?) AND r.id IS NULL
 		ORDER BY c.id
 	`
 	query, args, err := sqlx.In(q, userID, courseIDs)
