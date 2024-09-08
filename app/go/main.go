@@ -615,41 +615,65 @@ func (h *handlers) GetGrades(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	// 科目毎の成績計算処理
-	courseResults := make([]CourseResult, 0, len(registeredCourses))
-	myGPA := 0.0
-	myCredits := 0
-	totalScoreMap := make(map[string]int) // key: course_id
+	if len(registeredCourses) == 0 {
+		return c.JSON(http.StatusOK, GetGradeResponse{
+			Summary:       Summary{},
+			CourseResults: []CourseResult{},
+		})
+	}
+
+	courseIDs := make([]string, 0, len(registeredCourses))
+	for _, course := range registeredCourses {
+		courseIDs = append(courseIDs, course.ID)
+	}
+
+	var allClasses []Class
+	q := "SELECT * FROM classes WHERE course_id IN (?) ORDER BY part DESC"
+	query, args, _ := sqlx.In(q, courseIDs)
+	if err := h.DB.Select(&allClasses, h.DB.Rebind(query), args...); err != nil {
+		c.Logger().Error(err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
+	courseClassMap := make(map[string][]Class)
+	for _, class := range allClasses {
+		courseClassMap[class.CourseID] = append(courseClassMap[class.CourseID], class)
+	}
+
+	type ClassSummary struct {
+		ClassID    string        `db:"class_id"`
+		TotalCount int           `db:"total_count"`
+		UserScore  sql.NullInt64 `db:"user_score"`
+	}
+
+	// 講義ごとの集計
+	classSummaryMap := make(map[string]ClassSummary) // key: class_id
+	var classSummaries []ClassSummary
+	query = `
+		SELECT
+			COUNT(s.class_id) AS total_count,
+			MAX(CASE WHEN s.user_id = ? THEN s.score ELSE NULL END) AS user_score
+		FROM classes cl
+		LEFT JOIN submissions s ON cl.id = s.class_id
+		GROUP BY cl.id
+	`
+	if err := h.DB.Select(&classSummaries, query, userID); err != nil {
+		c.Logger().Error(err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
+	for _, s := range classSummaries {
+		classSummaryMap[s.ClassID] = s
+	}
+
+	totalScoreMap := make(map[string]int)          // key: course_id
 	classScoreMap := make(map[string][]ClassScore) // key: course_id
 	for _, course := range registeredCourses {
-		type MyClass struct {
-			Class
-			TotalCount int `db:"total_count"`
-			UserScore sql.NullInt64 `db:"user_score"`
-		}
-		var classes []MyClass
-		// course -> class -> submission
-		query = `
-			SELECT
-				cl.*,
-				COUNT(s.class_id) AS total_count,
-				MAX(CASE WHEN s.user_id = ? THEN s.score ELSE NULL END) AS user_score
-			FROM classes cl
-			LEFT JOIN submissions s ON cl.id = s.class_id
-			WHERE course_id = ?
-			GROUP BY cl.id
-			ORDER BY part DESC
-		`
-		if err := h.DB.Select(&classes, query, userID, course.ID); err != nil {
-			c.Logger().Error(err)
-			return c.NoContent(http.StatusInternalServerError)
-		}
-
 		// 講義毎の成績計算処理
+		classes := courseClassMap[course.ID]
 		classScores := make([]ClassScore, 0, len(classes))
 		for _, class := range classes {
+			summary := classSummaryMap[class.ID]
 			// ユーザーのスコア
-			myScore := class.UserScore
+			myScore := summary.UserScore
 
 			var myScorePtr *int
 			if err != sql.ErrNoRows && myScore.Valid {
@@ -663,12 +687,15 @@ func (h *handlers) GetGrades(c echo.Context) error {
 				Part:       class.Part,
 				Title:      class.Title,
 				Score:      myScorePtr,
-				Submitters: class.TotalCount,
+				Submitters: summary.TotalCount,
 			})
 		}
 		classScoreMap[course.ID] = classScores
 	}
 
+	courseResults := make([]CourseResult, 0, len(registeredCourses))
+	myGPA := 0.0
+	myCredits := 0
 	for _, course := range registeredCourses {
 		// この科目を履修している学生のTotalScore一覧を取得
 		var totals []int
