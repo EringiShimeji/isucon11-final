@@ -1531,7 +1531,7 @@ func (h *handlers) AddAnnouncement(c echo.Context) error {
 	for i, user := range targets {
 		values[i] = "('" + req.ID + "','" + user.ID + "')"
 	}
-	if _, err := tx.Exec("INSERT INTO `unread_announcements` (`announcement_id`, `user_id`) VALUES ?", strings.Join(values, ",")); err != nil {
+	if _, err := tx.Exec("INSERT INTO `unread_announcements` (`announcement_id`, `user_id`) VALUES " + strings.Join(values, ",")); err != nil {
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
