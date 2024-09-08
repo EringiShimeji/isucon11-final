@@ -468,8 +468,7 @@ func (h *handlers) RegisterCourses(c echo.Context) error {
 		}
 
 		// すでに履修登録済みの科目は無視する
-		var e int
-		if err := tx.Get(&e, "SELECT 1 FROM `registrations` WHERE `course_id` = ? AND `user_id` = ?", course.ID, userID); err != nil {
+		if err := tx.Get(nil, "SELECT 1 FROM `registrations` WHERE `course_id` = ? AND `user_id` = ?", course.ID, userID); err != nil {
 			if err == sql.ErrNoRows {
 				continue
 			}
@@ -1122,8 +1121,7 @@ func (h *handlers) SubmitAssignment(c echo.Context) error {
 	}
 
 	// registration の存在確認
-	var e int
-	if err := tx.Get(&e, "SELECT 1 FROM `registrations` WHERE `user_id` = ? AND `course_id` = ?", userID, courseID); err != nil {
+	if err := tx.Get(nil, "SELECT 1 FROM `registrations` WHERE `user_id` = ? AND `course_id` = ?", userID, courseID); err != nil {
 		if err == sql.ErrNoRows {
 			return c.String(http.StatusBadRequest, "You have not taken this  course.")
 		}
@@ -1533,8 +1531,7 @@ func (h *handlers) GetAnnouncementDetail(c echo.Context) error {
 		return c.String(http.StatusNotFound, "No such announcement.")
 	}
 
-	var e int
-	if err := tx.Get(&e, "SELECT 1 FROM `registrations` WHERE `course_id` = ? AND `user_id` = ?", announcement.CourseID, userID); err != nil {
+	if err := tx.Get(nil, "SELECT 1 FROM `registrations` WHERE `course_id` = ? AND `user_id` = ?", announcement.CourseID, userID); err != nil {
 		if err == sql.ErrNoRows {
 			return c.String(http.StatusNotFound, "No such announcement.")
 		}
