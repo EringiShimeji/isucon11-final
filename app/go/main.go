@@ -1528,8 +1528,8 @@ func (h *handlers) AddAnnouncement(c echo.Context) error {
 	}
 
 	type V struct {
-		announcementID string `db:"announcement_id"`
-		userID         string `db:"user_id"`
+		AnnouncementID string `db:"announcement_id"`
+		UserID         string `db:"user_id"`
 	}
 	values := make([]V, len(targets))
 	for i, user := range targets {
