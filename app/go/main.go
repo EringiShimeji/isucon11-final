@@ -441,6 +441,9 @@ func (h *handlers) RegisterCourses(c echo.Context) error {
 	sort.Slice(req, func(i, j int) bool {
 		return req[i].ID < req[j].ID
 	})
+	if len(req) == 0 {
+		return c.NoContent(http.StatusOK)
+	}
 
 	tx, err := h.DB.Beginx()
 	if err != nil {
@@ -466,10 +469,7 @@ func (h *handlers) RegisterCourses(c echo.Context) error {
 		WHERE c.id IN (?)
 		ORDER BY c.id
 	`
-	query, args, err := sqlx.In(q, userID, courseIDs)
-	if err != nil {
-		return c.NoContent(http.StatusInternalServerError)
-	}
+	query, args, _ := sqlx.In(q, userID, courseIDs)
 	var courses []MyCourse
 	if err := tx.Select(&courses, tx.Rebind(query), args...); err != nil {
 		c.Logger().Error(err)
@@ -501,37 +501,6 @@ func (h *handlers) RegisterCourses(c echo.Context) error {
 			errors.CourseNotFound = append(errors.CourseNotFound, courseID)
 		}
 	}
-
-	// for _, courseReq := range req {
-	// 	// コースは存在する?
-	// 	courseID := courseReq.ID
-	// 	var course Course
-	// 	if err := tx.Get(&course, "SELECT * FROM `courses` WHERE `id` = ? FOR SHARE", courseID); err != nil && err != sql.ErrNoRows {
-	// 		c.Logger().Error(err)
-	// 		return c.NoContent(http.StatusInternalServerError)
-	// 	} else if err == sql.ErrNoRows {
-	// 		errors.CourseNotFound = append(errors.CourseNotFound, courseReq.ID)
-	// 		continue
-	// 	}
-	//
-	// 	// 登録期間外
-	// 	if course.Status != StatusRegistration {
-	// 		errors.NotRegistrableStatus = append(errors.NotRegistrableStatus, course.ID)
-	// 		continue
-	// 	}
-	//
-	// 	// すでに履修登録済みの科目は無視する
-	// 	var e int
-	// 	if err := tx.Get(&e, "SELECT 1 FROM `registrations` WHERE `course_id` = ? AND `user_id` = ?", course.ID, userID); err != nil && err != sql.ErrNoRows {
-	// 		c.Logger().Error(err)
-	// 		return c.NoContent(http.StatusInternalServerError)
-	// 	}
-	// 	if e == 1 {
-	// 		continue
-	// 	}
-	//
-	// 	newlyAdded = append(newlyAdded, course)
-	// }
 
 	var alreadyRegistered []Course
 	query = "SELECT `courses`.*" +
