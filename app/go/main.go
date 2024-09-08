@@ -449,39 +449,84 @@ func (h *handlers) RegisterCourses(c echo.Context) error {
 	}
 	defer tx.Rollback()
 
+	courseIDs := make([]string, 0, len(req))
+	for _, courseReq := range req {
+		courseIDs = append(courseIDs, courseReq.ID)
+	}
+
+	// 存在するコースを先に取得
+	q := `
+		SELECT *
+		FROM courses c
+		LEFT JOIN registrations r ON c.id = r.course_id AND r.user_id = ?
+		WHERE c.id = ? AND r.id IS NULL
+		ORDER BY c.id
+	`
+	query, args, err := sqlx.In(q, userID, courseIDs)
+	if err != nil {
+		return c.NoContent(http.StatusInternalServerError)
+	}
+	var courses []Course
+	if err := tx.Select(&courses, tx.Rebind(query), args...); err != nil {
+		c.Logger().Error(err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
+
+	// courses を errors, newlyAdded に振り分ける
 	var errors RegisterCoursesErrorResponse
 	var newlyAdded []Course
-	for _, courseReq := range req {
-		courseID := courseReq.ID
-		var course Course
-		if err := tx.Get(&course, "SELECT * FROM `courses` WHERE `id` = ? FOR SHARE", courseID); err != nil && err != sql.ErrNoRows {
-			c.Logger().Error(err)
-			return c.NoContent(http.StatusInternalServerError)
-		} else if err == sql.ErrNoRows {
-			errors.CourseNotFound = append(errors.CourseNotFound, courseReq.ID)
-			continue
-		}
+	foundCourseIDSet := make(map[string]struct{}, len(courses))
+
+	for _, course := range courses {
+		foundCourseIDSet[course.ID] = struct{}{}
 
 		if course.Status != StatusRegistration {
 			errors.NotRegistrableStatus = append(errors.NotRegistrableStatus, course.ID)
 			continue
 		}
-
-		// すでに履修登録済みの科目は無視する
-		var e int
-		if err := tx.Get(&e, "SELECT 1 FROM `registrations` WHERE `course_id` = ? AND `user_id` = ?", course.ID, userID); err != nil && err != sql.ErrNoRows {
-			c.Logger().Error(err)
-			return c.NoContent(http.StatusInternalServerError)
-		}
-		if e == 1 {
-			continue
-		}
-
 		newlyAdded = append(newlyAdded, course)
 	}
 
+	// errors.CourseNotFound を埋める
+	for _, courseID := range courseIDs {
+		if _, ok := foundCourseIDSet[courseID]; !ok {
+			errors.CourseNotFound = append(errors.CourseNotFound, courseID)
+		}
+	}
+
+	// for _, courseReq := range req {
+	// 	// コースは存在する?
+	// 	courseID := courseReq.ID
+	// 	var course Course
+	// 	if err := tx.Get(&course, "SELECT * FROM `courses` WHERE `id` = ? FOR SHARE", courseID); err != nil && err != sql.ErrNoRows {
+	// 		c.Logger().Error(err)
+	// 		return c.NoContent(http.StatusInternalServerError)
+	// 	} else if err == sql.ErrNoRows {
+	// 		errors.CourseNotFound = append(errors.CourseNotFound, courseReq.ID)
+	// 		continue
+	// 	}
+	//
+	// 	// 登録期間外
+	// 	if course.Status != StatusRegistration {
+	// 		errors.NotRegistrableStatus = append(errors.NotRegistrableStatus, course.ID)
+	// 		continue
+	// 	}
+	//
+	// 	// すでに履修登録済みの科目は無視する
+	// 	var e int
+	// 	if err := tx.Get(&e, "SELECT 1 FROM `registrations` WHERE `course_id` = ? AND `user_id` = ?", course.ID, userID); err != nil && err != sql.ErrNoRows {
+	// 		c.Logger().Error(err)
+	// 		return c.NoContent(http.StatusInternalServerError)
+	// 	}
+	// 	if e == 1 {
+	// 		continue
+	// 	}
+	//
+	// 	newlyAdded = append(newlyAdded, course)
+	// }
+
 	var alreadyRegistered []Course
-	query := "SELECT `courses`.*" +
+	query = "SELECT `courses`.*" +
 		" FROM `courses`" +
 		" JOIN `registrations` ON `courses`.`id` = `registrations`.`course_id`" +
 		" WHERE `courses`.`status` != ? AND `registrations`.`user_id` = ?"
