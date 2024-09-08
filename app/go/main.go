@@ -403,11 +403,13 @@ func (h *handlers) GetRegisteredCourses(c echo.Context) error {
 
 	// 履修科目が0件の時は空配列を返却
 	res := make([]GetRegisteredCourseResponseContent, 0, len(courses))
-	tIds := make([]string, len(courses))
-	for i, course := range courses {
-		tIds[i] = course.TeacherID
-	}
 	if len(courses) != 0 {
+		tIds := make([]string, len(courses))
+		for i, course := range courses {
+			tIds[i] = course.TeacherID
+		}
+		names := make(map[string]string)
+
 		var teachers []User
 		q, a, err := sqlx.In("SELECT * FROM `users` WHERE `id` IN (?)", tIds)
 		if err != nil {
@@ -418,11 +420,16 @@ func (h *handlers) GetRegisteredCourses(c echo.Context) error {
 			c.Logger().Error(err)
 			return c.NoContent(http.StatusInternalServerError)
 		}
-		for i, course := range courses {
+
+		for _, t := range teachers {
+			names[t.ID] = t.Name
+		}
+
+		for _, course := range courses {
 			res = append(res, GetRegisteredCourseResponseContent{
 				ID:        course.ID,
 				Name:      course.Name,
-				Teacher:   teachers[i].Name,
+				Teacher:   names[course.TeacherID],
 				Period:    course.Period,
 				DayOfWeek: course.DayOfWeek,
 			})
