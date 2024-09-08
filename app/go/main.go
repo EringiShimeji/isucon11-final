@@ -1140,7 +1140,7 @@ func (h *handlers) SubmitAssignment(c echo.Context) error {
 	}
 
 	// registration の存在確認
-	if cache.isRegistrationExists(courseID, userID) {
+	if !cache.isRegistrationExists(courseID, userID) {
 		return c.String(http.StatusBadRequest, "You have not taken this  course.")
 	}
 
