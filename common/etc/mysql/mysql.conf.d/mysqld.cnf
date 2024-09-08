@@ -101,5 +101,3 @@ disable-log-bin
 
 innodb_status_output = ON
 innodb_status_output_locks = ON
-
-socket=/tmp/mysql.sock
