@@ -95,6 +95,10 @@ type InitializeResponse struct {
 	Language string `json:"language"`
 }
 
+func startCollectingWithPProtein() {
+	http.Get("http://localhost:9000/api/group/collect")
+}
+
 // Initialize POST /initialize 初期化エンドポイント
 func (h *handlers) Initialize(c echo.Context) error {
 	dbForInit, _ := GetDB(true)
@@ -126,12 +130,7 @@ func (h *handlers) Initialize(c echo.Context) error {
 	}
 
 	var once sync.Once
-	f := func() {
-		if _, err := http.Get("http://localhost:9000/api/group/collect"); err != nil {
-			c.Logger().Errorf("failed to request pprotein: %w", err)
-		}
-	}
-	once.Do(f)
+	once.Do(startCollectingWithPProtein)
 
 	res := InitializeResponse{
 		Language: "go",
