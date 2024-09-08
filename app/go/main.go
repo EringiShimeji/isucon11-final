@@ -403,20 +403,30 @@ func (h *handlers) GetRegisteredCourses(c echo.Context) error {
 
 	// 履修科目が0件の時は空配列を返却
 	res := make([]GetRegisteredCourseResponseContent, 0, len(courses))
-	for _, course := range courses {
-		var teacher User
-		if err := tx.Get(&teacher, "SELECT * FROM `users` WHERE `id` = ?", course.TeacherID); err != nil {
+	tIds := make([]string, len(courses))
+	for i, c := range courses {
+		tIds[i] = c.TeacherID
+	}
+	if len(courses) != 0 {
+		var teachers []User
+		q, a, err := sqlx.In("SELECT * FROM `users` WHERE `id` IN (?)", tIds)
+		if err != nil {
 			c.Logger().Error(err)
 			return c.NoContent(http.StatusInternalServerError)
 		}
-
-		res = append(res, GetRegisteredCourseResponseContent{
-			ID:        course.ID,
-			Name:      course.Name,
-			Teacher:   teacher.Name,
-			Period:    course.Period,
-			DayOfWeek: course.DayOfWeek,
-		})
+		if err := tx.Select(&teachers, q, a...); err != nil {
+			c.Logger().Error(err)
+			return c.NoContent(http.StatusInternalServerError)
+		}
+		for i, course := range courses {
+			res = append(res, GetRegisteredCourseResponseContent{
+				ID:        course.ID,
+				Name:      course.Name,
+				Teacher:   teachers[i].Name,
+				Period:    course.Period,
+				DayOfWeek: course.DayOfWeek,
+			})
+		}
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -695,8 +705,8 @@ func (h *handlers) GetGrades(c echo.Context) error {
 
 	courseTotalScores := make(map[string][]int)
 	type CourseTotalScore struct {
-		CourseID string `db:"course_id"`
-		TotalScore int `db:"total_score"`
+		CourseID   string `db:"course_id"`
+		TotalScore int    `db:"total_score"`
 	}
 	query = "SELECT courses.id AS course_id, IFNULL(SUM(`submissions`.`score`), 0) AS `total_score`" +
 		" FROM `users`" +
