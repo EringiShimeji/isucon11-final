@@ -472,7 +472,7 @@ func (h *handlers) RegisterCourses(c echo.Context) error {
 		// すでに履修登録済みの科目は無視する
 		e, err := getOrInsertMap(&cache.isRegistrationExists, courseID+","+userID, func() (bool, error) {
 			var e int
-			if err := tx.Get(&e, "SELECT 1 FROM `registrations` WHERE `course_id` = ? AND `user_id` = ?", course.ID, userID); err != nil && err != sql.ErrNoRows {
+			if err := tx.Get(&e, "SELECT 1 FROM `registrations` WHERE `course_id` = ? AND `user_id` = ?", course.ID, userID); err != nil {
 				return false, err
 			}
 			return true, nil
@@ -1142,23 +1142,15 @@ func (h *handlers) SubmitAssignment(c echo.Context) error {
 	}
 
 	// registration の存在確認
-	//_, err = getOrInsertMap(&cache.isRegistrationExists, courseID+userID, func() (bool, error) {
-	//	var e int
-	//	if err := tx.Get(&e, "SELECT 1 FROM `registrations` WHERE `course_id` = ? AND `user_id` = ?", courseID, userID); err != nil && err != sql.ErrNoRows {
-	//		return false, err
-	//	}
-	//	return true, nil
-	//})
-	//if err != nil {
-	//	if errors.Is(err, sql.ErrNoRows) {
-	//		return c.String(http.StatusBadRequest, "You have not taken this  course.")
-	//	}
-	//	c.Logger().Error(err)
-	//	return c.NoContent(http.StatusInternalServerError)
-	//}
-	var e int
-	if err := tx.Get(&e, "SELECT 1 FROM `registrations` WHERE `user_id` = ? AND `course_id` = ?", userID, courseID); err != nil {
-		if err == sql.ErrNoRows {
+	_, err = getOrInsertMap(&cache.isRegistrationExists, courseID+userID, func() (bool, error) {
+		var e int
+		if err := tx.Get(&e, "SELECT 1 FROM `registrations` WHERE `course_id` = ? AND `user_id` = ?", courseID, userID); err != nil {
+			return false, err
+		}
+		return true, nil
+	})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
 			return c.String(http.StatusBadRequest, "You have not taken this  course.")
 		}
 		c.Logger().Error(err)
@@ -1575,7 +1567,7 @@ func (h *handlers) GetAnnouncementDetail(c echo.Context) error {
 
 	_, err = getOrInsertMap(&cache.isRegistrationExists, announcement.CourseID+","+userID, func() (bool, error) {
 		var e int
-		if err := tx.Get(&e, "SELECT 1 FROM `registrations` WHERE `course_id` = ? AND `user_id` = ?", announcement.CourseID, userID); err != nil && err != sql.ErrNoRows {
+		if err := tx.Get(&e, "SELECT 1 FROM `registrations` WHERE `course_id` = ? AND `user_id` = ?", announcement.CourseID, userID); err != nil {
 			return false, err
 		}
 		return true, nil
