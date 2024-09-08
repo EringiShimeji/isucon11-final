@@ -468,12 +468,13 @@ func (h *handlers) RegisterCourses(c echo.Context) error {
 		}
 
 		// すでに履修登録済みの科目は無視する
-		if err := tx.Get(nil, "SELECT 1 FROM `registrations` WHERE `course_id` = ? AND `user_id` = ?", course.ID, userID); err != nil {
-			if err == sql.ErrNoRows {
-				continue
-			}
+		var count int
+		if err := tx.Get(&count, "SELECT COUNT(*) FROM `registrations` WHERE `course_id` = ? AND `user_id` = ?", course.ID, userID); err != nil {
 			c.Logger().Error(err)
 			return c.NoContent(http.StatusInternalServerError)
+		}
+		if count > 0 {
+			continue
 		}
 
 		newlyAdded = append(newlyAdded, course)
@@ -1120,13 +1121,13 @@ func (h *handlers) SubmitAssignment(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "This course is not in progress.")
 	}
 
-	// registration の存在確認
-	if err := tx.Get(nil, "SELECT 1 FROM `registrations` WHERE `user_id` = ? AND `course_id` = ?", userID, courseID); err != nil {
-		if err == sql.ErrNoRows {
-			return c.String(http.StatusBadRequest, "You have not taken this  course.")
-		}
+	var registrationCount int
+	if err := tx.Get(&registrationCount, "SELECT COUNT(*) FROM `registrations` WHERE `user_id` = ? AND `course_id` = ?", userID, courseID); err != nil {
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
+	}
+	if registrationCount == 0 {
+		return c.String(http.StatusBadRequest, "You have not taken this course.")
 	}
 
 	var submissionClosed bool
@@ -1531,12 +1532,13 @@ func (h *handlers) GetAnnouncementDetail(c echo.Context) error {
 		return c.String(http.StatusNotFound, "No such announcement.")
 	}
 
-	if err := tx.Get(nil, "SELECT 1 FROM `registrations` WHERE `course_id` = ? AND `user_id` = ?", announcement.CourseID, userID); err != nil {
-		if err == sql.ErrNoRows {
-			return c.String(http.StatusNotFound, "No such announcement.")
-		}
+	var registrationCount int
+	if err := tx.Get(&registrationCount, "SELECT COUNT(*) FROM `registrations` WHERE `course_id` = ? AND `user_id` = ?", announcement.CourseID, userID); err != nil {
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
+	}
+	if registrationCount == 0 {
+		return c.String(http.StatusNotFound, "No such announcement.")
 	}
 
 	if _, err := tx.Exec("UPDATE `unread_announcements` SET `is_deleted` = TRUE WHERE `announcement_id` = ? AND `user_id` = ?", announcementID, userID); err != nil {
