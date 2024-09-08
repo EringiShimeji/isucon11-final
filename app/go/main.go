@@ -1527,6 +1527,14 @@ func (h *handlers) AddAnnouncement(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
+	if len(targets) == 0 {
+		if err := tx.Commit(); err != nil {
+			c.Logger().Error(err)
+			return c.NoContent(http.StatusInternalServerError)
+		}
+		return c.NoContent(http.StatusCreated)
+	}
+
 	type V struct {
 		AnnouncementID string `db:"announcement_id"`
 		UserID         string `db:"user_id"`
