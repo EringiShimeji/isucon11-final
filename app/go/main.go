@@ -457,7 +457,7 @@ func (h *handlers) RegisterCourses(c echo.Context) error {
 	// 存在するコースを先に取得
 	type MyCourse struct {
 		Course
-		registered bool `db:"registered"`
+		Registered bool `db:"registered"`
 	}
 	q := `
 		SELECT c.*, r.user_id IS NOT NULL AS registered
@@ -489,7 +489,7 @@ func (h *handlers) RegisterCourses(c echo.Context) error {
 			continue
 		}
 
-		if course.registered {
+		if course.Registered {
 			continue
 		}
 		newlyAdded = append(newlyAdded, course.Course)
