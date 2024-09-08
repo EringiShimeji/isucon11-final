@@ -455,18 +455,22 @@ func (h *handlers) RegisterCourses(c echo.Context) error {
 	}
 
 	// 存在するコースを先に取得
+	type MyCourse struct {
+		Course
+		registered bool `db:"registered"`
+	}
 	q := `
-		SELECT c.*
+		SELECT c.*, r.user_id IS NOT NULL AS registered
 		FROM courses c
 		LEFT JOIN registrations r ON c.id = r.course_id AND r.user_id = ?
-		WHERE c.id IN (?) AND r.course_id IS NULL
+		WHERE c.id IN (?)
 		ORDER BY c.id
 	`
 	query, args, err := sqlx.In(q, userID, courseIDs)
 	if err != nil {
 		return c.NoContent(http.StatusInternalServerError)
 	}
-	var courses []Course
+	var courses []MyCourse
 	if err := tx.Select(&courses, tx.Rebind(query), args...); err != nil {
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
@@ -484,7 +488,11 @@ func (h *handlers) RegisterCourses(c echo.Context) error {
 			errors.NotRegistrableStatus = append(errors.NotRegistrableStatus, course.ID)
 			continue
 		}
-		newlyAdded = append(newlyAdded, course)
+
+		if course.registered {
+			continue
+		}
+		newlyAdded = append(newlyAdded, course.Course)
 	}
 
 	// errors.CourseNotFound を埋める
