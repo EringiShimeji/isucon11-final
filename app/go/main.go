@@ -2,7 +2,7 @@ package main
 
 import (
 	"database/sql"
-	errs "errors"
+	"errors"
 	"fmt"
 	"github.com/go-sql-driver/mysql"
 	"github.com/gorilla/sessions"
@@ -188,15 +188,15 @@ func getUserInfo(c echo.Context) (userID string, userName string, isAdmin bool, 
 	}
 	_userID, ok := sess.Values["userID"]
 	if !ok {
-		return "", "", false, errs.New("failed to get userID from session")
+		return "", "", false, errors.New("failed to get userID from session")
 	}
 	_userName, ok := sess.Values["userName"]
 	if !ok {
-		return "", "", false, errs.New("failed to get userName from session")
+		return "", "", false, errors.New("failed to get userName from session")
 	}
 	_isAdmin, ok := sess.Values["isAdmin"]
 	if !ok {
-		return "", "", false, errs.New("failed to get isAdmin from session")
+		return "", "", false, errors.New("failed to get isAdmin from session")
 	}
 	return _userID.(string), _userName.(string), _isAdmin.(bool), nil
 }
@@ -470,18 +470,12 @@ func (h *handlers) RegisterCourses(c echo.Context) error {
 		}
 
 		// すでに履修登録済みの科目は無視する
-		e, err := getOrInsertMap(&cache.isRegistrationExists, courseID+userID, func() (bool, error) {
-			var e int
-			if err := tx.Get(&e, "SELECT 1 FROM `registrations` WHERE `course_id` = ? AND `user_id` = ?", course.ID, userID); err != nil && err != sql.ErrNoRows {
-				return false, err
-			}
-			return true, nil
-		})
-		if err != nil && !errs.Is(err, sql.ErrNoRows) {
+		var e int
+		if err := tx.Get(&e, "SELECT 1 FROM `registrations` WHERE `course_id` = ? AND `user_id` = ?", course.ID, userID); err != nil && err != sql.ErrNoRows {
 			c.Logger().Error(err)
 			return c.NoContent(http.StatusInternalServerError)
 		}
-		if e {
+		if e == 1 {
 			continue
 		}
 
@@ -945,7 +939,7 @@ func (h *handlers) SetCourseStatus(c echo.Context) error {
 		return true, nil
 	})
 	if err != nil {
-		if errs.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return c.String(http.StatusNotFound, "No such course.")
 		}
 		c.Logger().Error(err)
@@ -1009,7 +1003,7 @@ func (h *handlers) GetClasses(c echo.Context) error {
 		return true, nil
 	})
 	if err != nil {
-		if errs.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return c.String(http.StatusNotFound, "No such course.")
 		}
 		c.Logger().Error(err)
@@ -1142,15 +1136,9 @@ func (h *handlers) SubmitAssignment(c echo.Context) error {
 	}
 
 	// registration の存在確認
-	_, err = getOrInsertMap(&cache.isRegistrationExists, courseID+userID, func() (bool, error) {
-		var e int
-		if err := tx.Get(&e, "SELECT 1 FROM `registrations` WHERE `course_id` = ? AND `user_id` = ?", courseID, userID); err != nil && err != sql.ErrNoRows {
-			return false, err
-		}
-		return true, nil
-	})
-	if err != nil {
-		if errs.Is(err, sql.ErrNoRows) {
+	var e int
+	if err := tx.Get(&e, "SELECT 1 FROM `registrations` WHERE `user_id` = ? AND `course_id` = ?", userID, courseID); err != nil {
+		if err == sql.ErrNoRows {
 			return c.String(http.StatusBadRequest, "You have not taken this  course.")
 		}
 		c.Logger().Error(err)
@@ -1476,7 +1464,7 @@ func (h *handlers) AddAnnouncement(c echo.Context) error {
 		return true, nil
 	})
 	if err != nil {
-		if errs.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return c.String(http.StatusNotFound, "No such course.")
 		}
 		c.Logger().Error(err)
@@ -1565,15 +1553,9 @@ func (h *handlers) GetAnnouncementDetail(c echo.Context) error {
 		return c.String(http.StatusNotFound, "No such announcement.")
 	}
 
-	_, err = getOrInsertMap(&cache.isRegistrationExists, announcement.CourseID+userID, func() (bool, error) {
-		var e int
-		if err := tx.Get(&e, "SELECT 1 FROM `registrations` WHERE `course_id` = ? AND `user_id` = ?", announcement.CourseID, userID); err != nil && err != sql.ErrNoRows {
-			return false, err
-		}
-		return true, nil
-	})
-	if err != nil {
-		if errs.Is(err, sql.ErrNoRows) {
+	var e int
+	if err := tx.Get(&e, "SELECT 1 FROM `registrations` WHERE `course_id` = ? AND `user_id` = ?", announcement.CourseID, userID); err != nil {
+		if err == sql.ErrNoRows {
 			return c.String(http.StatusNotFound, "No such announcement.")
 		}
 		c.Logger().Error(err)
