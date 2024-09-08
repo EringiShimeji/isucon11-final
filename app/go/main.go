@@ -456,7 +456,7 @@ func (h *handlers) RegisterCourses(c echo.Context) error {
 
 	// 存在するコースを先に取得
 	q := `
-		SELECT *
+		SELECT c.*
 		FROM courses c
 		LEFT JOIN registrations r ON c.id = r.course_id AND r.user_id = ?
 		WHERE c.id IN (?) AND r.course_id IS NULL
